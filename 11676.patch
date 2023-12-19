@@ -1,0 +1,24 @@
+From e860a7e4a4f0133ca2905c48f39a209fa8604b6a Mon Sep 17 00:00:00 2001
+From: "Shane W.D. Hart" <hartsw@ornl.gov>
+Date: Tue, 14 Mar 2023 18:25:55 -0400
+Subject: [PATCH] Add missing <cstdint> include in teuchos for GCC 13
+
+While testing Fedora 38 (beta) it was determined that teuchos
+was missing an include for <cstdint>.  This was added where
+required.
+---
+ packages/teuchos/core/src/Teuchos_BigUIntDecl.hpp | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/packages/teuchos/core/src/Teuchos_BigUIntDecl.hpp b/packages/teuchos/core/src/Teuchos_BigUIntDecl.hpp
+index e82e8be9e9ab..b41b0d035af1 100644
+--- a/packages/teuchos/core/src/Teuchos_BigUIntDecl.hpp
++++ b/packages/teuchos/core/src/Teuchos_BigUIntDecl.hpp
+@@ -43,6 +43,7 @@
+ #define TEUCHOS_BIG_UINT_DECL_HPP
+ 
+ #include <iosfwd>
++#include <cstdint>
+ 
+ /*! \file Teuchos_BigUIntDecl.hpp
+     \brief Arbitrary-precision unsigned integer declaration.

@@ -1,0 +1,64 @@
+The following changes since commit f2c452c9c42005672a3f3ed9218dd9a7fecca79a:
+
+  Update version number to 9.2.6 (2023-02-13 10:02:54 -0500)
+
+are available in the Git repository at:
+
+  https://gitlab.kitware.com/vtk/vtk.git 
+
+for you to fetch changes up to 1d57a906792b91e71166f437305c9e08f15eb520:
+
+  More #include <cstdint> to compile with gcc13 (2023-03-27 14:46:50 +0900)
+
+----------------------------------------------------------------
+Laurent Rineau (2):
+      Add #include <cstdint> to compile with gcc13
+      More #include <cstdint> to compile with gcc13
+
+ IO/Image/vtkSEPReader.h                               | 5 +++--
+ IO/PIO/PIOData.h                                      | 1 +
+ Rendering/Matplotlib/vtkMatplotlibMathTextUtilities.h | 3 ++-
+ 3 files changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/IO/Image/vtkSEPReader.h b/IO/Image/vtkSEPReader.h
+index 83d127a41e..b9110780f2 100644
+--- a/IO/Image/vtkSEPReader.h
++++ b/IO/Image/vtkSEPReader.h
+@@ -25,8 +25,9 @@
+ #include "vtkImageAlgorithm.h"
+ #include "vtkNew.h" // for ivars
+ 
+-#include <array>  // for std::array
+-#include <string> // for std::string
++#include <array>   // for std::array
++#include <cstdint> // for std::uint8_t and std::uint32_t
++#include <string>  // for std::string
+ 
+ namespace details
+ {
+diff --git a/IO/PIO/PIOData.h b/IO/PIO/PIOData.h
+index 98137f44c1..03e59f7c83 100644
+--- a/IO/PIO/PIOData.h
++++ b/IO/PIO/PIOData.h
+@@ -1,6 +1,7 @@
+ #if !defined(_PIODATA_H)
+ #define _PIODATA_H
+ 
++#include <cstdint>
+ #include <fstream>
+ #include <iostream>
+ #include <list>
+diff --git a/Rendering/Matplotlib/vtkMatplotlibMathTextUtilities.h b/Rendering/Matplotlib/vtkMatplotlibMathTextUtilities.h
+index ca5445ddf4..d0ba449a3c 100644
+--- a/Rendering/Matplotlib/vtkMatplotlibMathTextUtilities.h
++++ b/Rendering/Matplotlib/vtkMatplotlibMathTextUtilities.h
+@@ -49,7 +49,8 @@
+ #include "vtkMathTextUtilities.h"
+ #include "vtkRenderingMatplotlibModule.h" // For export macro
+ 
+-#include <vector> // for std::vector
++#include <cstdint> // for std::uint64_t
++#include <vector>  // for std::vector
+ 
+ struct _object;
+ typedef struct _object PyObject;

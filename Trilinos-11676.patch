@@ -1,0 +1,24 @@
+diff --git a/packages/kokkos/core/src/impl/Kokkos_MemoryPool.cpp b/packages/kokkos/core/src/impl/Kokkos_MemoryPool.cpp
+index 889d821bb1c..3ddc1d3515e 100644
+--- a/packages/kokkos/core/src/impl/Kokkos_MemoryPool.cpp
++++ b/packages/kokkos/core/src/impl/Kokkos_MemoryPool.cpp
+@@ -46,6 +46,7 @@
+ 
+ #include <ostream>
+ #include <sstream>
++#include <cstdint>
+ 
+ //----------------------------------------------------------------------------
+ //----------------------------------------------------------------------------
+diff --git a/packages/teuchos/core/src/Teuchos_BigUIntDecl.hpp b/packages/teuchos/core/src/Teuchos_BigUIntDecl.hpp
+index e82e8be9e9a..b41b0d035af 100644
+--- a/packages/teuchos/core/src/Teuchos_BigUIntDecl.hpp
++++ b/packages/teuchos/core/src/Teuchos_BigUIntDecl.hpp
+@@ -43,6 +43,7 @@
+ #define TEUCHOS_BIG_UINT_DECL_HPP
+ 
+ #include <iosfwd>
++#include <cstdint>
+ 
+ /*! \file Teuchos_BigUIntDecl.hpp
+     \brief Arbitrary-precision unsigned integer declaration.
