@@ -9,6 +9,7 @@ ARG TRI_13_4=13-4-1
 ARG TRI_14_0=14-0-0
 ARG TRI_14_2=14-2-0
 ARG TRI_14_4=14-4-0
+ARG PV_5_12=5.12.0
 ARG NINJA_ARG="-l 18"
 ARG PYTHON=311
 
@@ -20,70 +21,110 @@ ARG USE_OMPI=". /etc/profile.d/lmod.sh && module load gnu && module load openmpi
 
 FROM opensuse/tumbleweed:latest AS base
 ARG PYTHON
-RUN zypper in -y tar gzip curl cmake ninja clang boost-devel libtiff-devel \
-                 patch libOSMesa-devel Mesa-devel libqt5-qtbase-devel \
-                 libXt-devel libXmu-devel proj-devel \
-                 gcc gcc-c++ gcc-fortran \
-                 gcc7 gcc7-c++ gcc7-fortran python${PYTHON}-devel \
-                 lua-lmod openmpi4-gnu-hpc-devel mpich-gnu-hpc-devel \
-                 blas-devel cblas-devel libopenblas-gnu-hpc-devel \
-                 lapack-devel lapacke-devel \
-                 hdf5-gnu-mpich-hpc-devel hdf5-gnu-openmpi4-hpc-devel
+RUN zypper in -y tar gzip curl cmake ninja clang boost-devel           \
+                 libtiff-devel patch libOSMesa-devel Mesa-devel        \
+                 libqt5-qtbase-devel libqt5-linguist-devel             \
+                 libqt5-qt3d-devel libqt5-qtbase-common-devel          \
+                 libqt5-qtbase-devel libqt5-qtconnectivity-devel       \
+                 libqt5-qtdeclarative-devel libqt5-qtdoc-devel         \
+                 libqt5-qtgamepad-devel libqt5-qtimageformats-devel    \
+                 libqt5-qtlocation-devel libqt5-qtmultimedia-devel     \
+                 libqt5-qtnetworkauth-devel libqt5-qtpdf-devel         \
+                 libqt5-qtquick3d-devel libqt5-qtremoteobjects-devel   \
+                 libqt5-qtscript-devel libqt5-qtscxml-devel            \
+                 libqt5-qtsensors-devel libqt5-qtserialbus-devel       \
+                 libqt5-qtserialport-devel libqt5-qtspeech-devel       \
+                 libqt5-qtstyleplugins-devel libqt5-qtsvg-devel        \
+                 libqt5-qttools-devel libqt5-qtvirtualkeyboard-devel   \
+                 libqt5-qtwayland-devel libqt5-qtwebchannel-devel      \
+                 libqt5-qtwebengine-devel libqt5-qtwebsockets-devel    \
+                 libqt5-qtwebview-devel libqt5-qtx11extras-devel       \
+                 libqt5-qtxmlpatterns-devel git libXt-devel            \
+                 libXmu-devel proj-devel gcc gcc-c++ gcc-fortran gcc7  \
+                 gcc7-c++ gcc7-fortran python${PYTHON}-devel lua-lmod  \
+                 openmpi4-gnu-hpc-devel mpich-gnu-hpc-devel blas-devel \
+                 cblas-devel libopenblas-gnu-hpc-devel lapack-devel    \
+                 lapacke-devel hdf5-gnu-mpich-hpc-devel                \
+                 hdf5-gnu-openmpi4-hpc-devel                           \
+                 netcdf-gnu-mpich-hpc-devel                            \
+                 netcdf-gnu-openmpi4-hpc-devel                         \
+                 pnetcdf-gnu-mpich-hpc-devel                           \
+                 pnetcdf-gnu-openmpi4-hpc-devel
 
-FROM opensuse/tumbleweed:latest AS vtksrc82
+FROM opensuse/tumbleweed:latest AS git
+RUN zypper in -y git
+
+FROM git AS vtksrc
+RUN mkdir /opt/src && cd /opt/src && \
+    git clone --recursive https://gitlab.kitware.com/vtk/vtk.git
+
+FROM git AS pvsrc
+RUN mkdir /opt/src && cd /opt/src && \
+    git clone --recursive https://gitlab.kitware.com/paraview/paraview.git
+
+FROM git AS trilinossrc
+RUN mkdir /opt/src && cd /opt/src && \
+    git clone --recursive https://github.com/trilinos/Trilinos.git
+
+FROM vtksrc AS vtksrc82
 ARG VTK82
-ARG VTKHOST
-RUN cd /opt && curl -LO ${VTKHOST}/8.2/VTK-${VTK82}.tar.gz
+RUN cd /opt/src/vtk && git checkout v${VTK82} && \
+    git submodule update --recursive
 
-FROM opensuse/tumbleweed:latest AS vtksrc90
-ARG VTK90
-ARG VTKHOST
-RUN cd /opt && curl -LO ${VTKHOST}/9.0/VTK-${VTK90}.tar.gz
+FROM vtksrc AS vtksrc90
+ARG VTK82
+RUN cd /opt/src/vtk && git checkout v${VTK90} && \
+    git submodule update --recursive
 
-FROM opensuse/tumbleweed:latest AS vtksrc91
+FROM vtksrc AS vtksrc91
 ARG VTK91
-ARG VTKHOST
-RUN cd /opt && curl -LO ${VTKHOST}/9.1/VTK-${VTK91}.tar.gz
+RUN cd /opt/src/vtk && git checkout v${VTK91} && \
+    git submodule update --recursive
 
-FROM opensuse/tumbleweed:latest AS vtksrc92
+FROM vtksrc AS vtksrc92
 ARG VTK92
-ARG VTKHOST
-RUN cd /opt && curl -LO ${VTKHOST}/9.2/VTK-${VTK92}.tar.gz
+RUN cd /opt/src/vtk && git checkout v${VTK92} && \
+    git submodule update --recursive
 
-FROM opensuse/tumbleweed:latest AS vtksrc93
+FROM vtksrc AS vtksrc93
 ARG VTK93
-ARG VTKHOST
-RUN cd /opt && curl -LO ${VTKHOST}/9.3/VTK-${VTK93}.tar.gz
+RUN cd /opt/src/vtk && git checkout v${VTK93} && \
+    git submodule update --recursive
 
-FROM opensuse/tumbleweed:latest AS trilinossrc-13-0
+FROM trilinossrc AS trilinossrc-13-0
 ARG TRI_13_0
-ARG TRIHOST
-RUN cd /opt && curl -LO ${TRIHOST}/trilinos-release-${TRI_13_0}.tar.gz
+RUN cd /opt/src/Trilinos && git checkout trilinos-release-${TRI_13_0} && \
+    git submodule update --recursive
 
-FROM opensuse/tumbleweed:latest AS trilinossrc-13-2
+FROM trilinossrc AS trilinossrc-13-2
 ARG TRI_13_2
-ARG TRIHOST
-RUN cd /opt && curl -LO ${TRIHOST}/trilinos-release-${TRI_13_2}.tar.gz
+RUN cd /opt/src/Trilinos && git checkout trilinos-release-${TRI_13_2} && \
+    git submodule update --recursive
 
-FROM opensuse/tumbleweed:latest AS trilinossrc-13-4
+FROM trilinossrc AS trilinossrc-13-4
 ARG TRI_13_4
-ARG TRIHOST
-RUN cd /opt && curl -LO ${TRIHOST}/trilinos-release-${TRI_13_4}.tar.gz
+RUN cd /opt/src/Trilinos && git checkout trilinos-release-${TRI_13_4} && \
+    git submodule update --recursive
 
-FROM opensuse/tumbleweed:latest AS trilinossrc-14-0
+FROM trilinossrc AS trilinossrc-14-0
 ARG TRI_14_0
-ARG TRIHOST
-RUN cd /opt && curl -LO ${TRIHOST}/trilinos-release-${TRI_14_0}.tar.gz
+RUN cd /opt/src/Trilinos && git checkout trilinos-release-${TRI_14_0} && \
+    git submodule update --recursive
 
-FROM opensuse/tumbleweed:latest AS trilinossrc-14-2
+FROM trilinossrc AS trilinossrc-14-2
 ARG TRI_14_2
-ARG TRIHOST
-RUN cd /opt && curl -LO ${TRIHOST}/trilinos-release-${TRI_14_2}.tar.gz
+RUN cd /opt/src/Trilinos && git checkout trilinos-release-${TRI_14_2} && \
+    git submodule update --recursive
 
-FROM opensuse/tumbleweed:latest AS trilinossrc-14-4
+FROM trilinossrc AS trilinossrc-14-4
 ARG TRI_14_4
-ARG TRIHOST
-RUN cd /opt && curl -LO ${TRIHOST}/trilinos-release-${TRI_14_4}.tar.gz
+RUN cd /opt/src/Trilinos && git checkout trilinos-release-${TRI_14_4} && \
+    git submodule update --recursive
+
+FROM pvsrc AS pvsrc-5-12
+ARG PV_5_12
+RUN cd /opt/src/paraview && git checkout v${PV_5_12} && \
+    git submodule update --recursive
 
 FROM base AS vtk93
 ARG VTK93
@@ -98,6 +139,7 @@ ARG VTK93ARGS="\
     -DBUILD_SHARED_LIBS=ON \
     -DVTK_MODULE_USE_EXTERNAL_VTK_libproj=ON \
     -DVTK_MODULE_USE_EXTERNAL_VTK_hdf5=ON \
+    -DVTK_MODULE_USE_EXTERNAL_VTK_netcdf=ON \
     -DVTK_WRAP_PYTHON=ON \
     -DVTK_USE_MPI=ON \
     -DVTK_GROUP_ENABLE_MPI=DEFAULT \
@@ -106,19 +148,18 @@ ARG VTK93ARGS="\
     -DVTK_MODULE_ENABLE_VTK_IOXdmf3=YES \
     -DVTK_MODULE_ENABLE_VTK_InfovisCore=YES"
 WORKDIR /opt
-COPY --from=vtksrc93 /opt/VTK-${VTK93}.tar.gz /opt
-RUN tar xf VTK-${VTK93}.tar.gz
-RUN eval "${USE_MPICH}" && module load phdf5 && \
+COPY --from=vtksrc93 /opt/src/vtk /opt/src/vtk
+RUN eval "${USE_MPICH}" && module load phdf5 netcdf pnetcdf && \
     mkdir build-mpich && cd build-mpich && \
     export MPI_HOME="$MPI_DIR" && \
-    cmake -S ../VTK-${VTK93} -B . \
+    cmake -S ../src/vtk -B . \
     -DCMAKE_INSTALL_PREFIX=/opt/VTK/${VTK93}-mpich ${VTK93ARGS} -G Ninja || \
-    cmake -S ../VTK-${VTK93} -B . -DMPI_C_COMPILE_OPTIONS= && \
+    cmake -S ../src/vtk -B . -DMPI_C_COMPILE_OPTIONS= && \
     ninja ${NINJA_ARG} && ninja install
-RUN eval "${USE_OMPI}" && module load phdf5 && \
+RUN eval "${USE_OMPI}" && module load phdf5 netcdf pnetcdf && \
     mkdir build-ompi && cd build-ompi && \
     export MPI_HOME="$MPI_DIR" && \
-    cmake -S ../VTK-${VTK93} -B . \
+    cmake -S ../src/vtk -B . \
     -DCMAKE_INSTALL_PREFIX=/opt/VTK/${VTK93}-ompi ${VTK93ARGS} -G Ninja && \
     ninja ${NINJA_ARG} && ninja install
 
@@ -136,6 +177,7 @@ ARG VTK92ARGS="\
     -DBUILD_SHARED_LIBS=ON \
     -DVTK_MODULE_USE_EXTERNAL_VTK_libproj=ON \
     -DVTK_MODULE_USE_EXTERNAL_VTK_hdf5=ON \
+    -DVTK_MODULE_USE_EXTERNAL_VTK_netcdf=ON \
     -DVTK_WRAP_PYTHON=ON \
     -DVTK_USE_MPI=ON \
     -DVTK_GROUP_ENABLE_MPI=DEFAULT \
@@ -144,22 +186,46 @@ ARG VTK92ARGS="\
     -DVTK_MODULE_ENABLE_VTK_IOXdmf3=YES \
     -DVTK_MODULE_ENABLE_VTK_InfovisCore=YES"
 WORKDIR /opt
-COPY --from=vtksrc92 /opt/VTK-${VTK92}.tar.gz /opt
+COPY --from=vtksrc92 /opt/src/vtk /opt/src/vtk
 COPY ${P1} /opt/
-RUN tar xf VTK-${VTK92}.tar.gz
-RUN cd VTK-${VTK92} && patch --fuzz=0 -p1 < /opt/${P1}
-RUN eval "${USE_MPICH}" && module load phdf5 && \
+RUN cd src/vtk && patch --fuzz=0 -p1 < /opt/${P1}
+RUN eval "${USE_MPICH}" && module load phdf5 netcdf pnetcdf && \
     mkdir build-mpich && cd build-mpich && \
     export MPI_HOME="$MPI_DIR" && \
-    cmake -S ../VTK-${VTK92} -B . \
+    cmake -S ../src/vtk -B . \
     -DCMAKE_INSTALL_PREFIX=/opt/VTK/${VTK92}-mpich ${VTK92ARGS} -G Ninja || \
-    cmake -S ../VTK-${VTK92} -B . -DMPI_C_COMPILE_OPTIONS= && \
+    cmake -S ../src/vtk -B . -DMPI_C_COMPILE_OPTIONS= && \
     ninja ${NINJA_ARG} && ninja install
-RUN eval "${USE_OMPI}" && module load phdf5 && \
+RUN eval "${USE_OMPI}" && module load phdf5 netcdf pnetcdf && \
     mkdir build-ompi && cd build-ompi && \
     export MPI_HOME="$MPI_DIR" && \
-    cmake -S ../VTK-${VTK92} -B . \
+    cmake -S ../src/vtk -B . \
     -DCMAKE_INSTALL_PREFIX=/opt/VTK/${VTK92}-ompi ${VTK92ARGS} -G Ninja && \
+    ninja ${NINJA_ARG} && ninja install
+
+FROM base AS pv-5-12
+ARG PV_5_12
+ARG USE_OMPI
+ARG NINJA_ARGS
+ARG PV_5_12_ARGS="\
+    -DCMAKE_C_COMPILER=gcc \
+    -DCMAKE_CXX_COMPILER=g++ \
+    -DCMAKE_Fortran_COMPILER=gfortran \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DPARAVIEW_BUILD_SHARED_LIBS=ON \
+    -DVTK_MODULE_USE_EXTERNAL_VTK_libproj=ON \
+    -DVTK_MODULE_USE_EXTERNAL_VTK_hdf5=ON \
+    -DVTK_MODULE_USE_EXTERNAL_VTK_netcdf=ON \
+    -DPARAVIEW_USE_MPI=ON \
+    -DPARAVIEW_USE_PYTHON=ON \
+    -DPARAVIEW_BUILD_ALL_MODULES=ON"
+WORKDIR /opt
+COPY --from=pvsrc-5-12 /opt/src/paraview /opt/src/paraview
+RUN eval "${USE_OMPI}" && module load phdf5 netcdf pnetcdf && \
+    mkdir build-ompi && cd build-ompi && \
+    export MPI_HOME="$MPI_DIR" && \
+    cmake -S ../src/paraview -B . \
+    -DCMAKE_INSTALL_PREFIX=/opt/paraview/${PV_5_12}-ompi ${PV_5_12_ARGS} -G Ninja && \
     ninja ${NINJA_ARG} && ninja install
 
 FROM base AS tri-13-4
@@ -179,14 +245,13 @@ ARG TRI_13_4_ARGS="\
     -DTrilinos_ENABLE_Zoltan2Core=ON"
 ARG P1="Trilinos-11676.patch"
 WORKDIR /opt
-COPY --from=trilinossrc-13-4 /opt/trilinos-release-${TRI_13_4}.tar.gz /opt
+COPY --from=trilinossrc-13-4 /opt/src/Trilinos /opt/src/Trilinos
 COPY ${P1} /opt
-RUN tar xf trilinos-release-${TRI_13_4}.tar.gz
-RUN cd Trilinos-trilinos-release-${TRI_13_4} && patch -p1 --fuzz=0 < /opt/${P1}
+RUN cd src/Trilinos && patch -p1 --fuzz=0 < /opt/${P1}
 RUN eval "${USE_MPICH}" && \
     mkdir build-mpich && cd build-mpich && \
     export MPI_HOME="$MPI_DIR" && \
-    cmake -S ../Trilinos-trilinos-release-${TRI_13_4} -B . \
+    cmake -S ../src/Trilinos -B . \
     -DCMAKE_INSTALL_PREFIX=/opt/trilinos/${TRI_13_4}-mpich ${TRI_13_4_ARGS} \
     -DCMAKE_C_FLAGS=-Wno-error=return-type \
     -DCMAKE_CXX_FLAGS=-Wno-error=return-type \
@@ -195,7 +260,7 @@ RUN eval "${USE_MPICH}" && \
 RUN eval "${USE_OMPI}" && \
     mkdir build-ompi && cd build-ompi && \
     export MPI_HOME="$MPI_DIR" && \
-    cmake -S ../Trilinos-trilinos-release-${TRI_13_4} -B . \
+    cmake -S ../src/Trilinos -B . \
     -DCMAKE_INSTALL_PREFIX=/opt/trilinos/${TRI_13_4}-ompi ${TRI_13_4_ARGS} \
     -G Ninja && \
     ninja ${NINJA_ARG} && ninja install
@@ -241,6 +306,7 @@ ARG VTK93
 ARG TRI_13_0
 ARG TRI_13_2
 ARG TRI_13_4
+ARG PV_5_12
 #COPY --from=vtk82 /opt/VTK/${VTK82}* /opt/
 RUN mkdir /opt/VTK /opt/trilinos
 COPY --from=vtk92 /opt/VTK/${VTK92}-ompi /opt/VTK/${VTK92}-ompi
@@ -249,3 +315,4 @@ COPY --from=vtk93 /opt/VTK/${VTK93}-ompi /opt/VTK/${VTK93}-ompi
 COPY --from=vtk93 /opt/VTK/${VTK93}-mpich /opt/VTK/${VTK93}-mpich
 COPY --from=tri-13-4 /opt/trilinos/${TRI_13_4}-ompi /opt/trilinos/${TRI_13_4}-ompi
 COPY --from=tri-13-4 /opt/trilinos/${TRI_13_4}-mpich /opt/trilinos/${TRI_13_4}-mpich
+COPY --from=pv-5-12 /opt/paraview/${PV_5_12}-ompi /opt/paraview/${PV_5_12}-ompi
