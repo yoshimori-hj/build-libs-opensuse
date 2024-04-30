@@ -226,7 +226,7 @@ RUN eval "${USE_OMPI}" && module load phdf5 netcdf pnetcdf && \
     export MPI_HOME="$MPI_DIR" && \
     cmake -S ../src/paraview -B . \
     -DCMAKE_INSTALL_PREFIX=/opt/paraview/${PV_5_12}-ompi ${PV_5_12_ARGS} -G Ninja && \
-    ninja ${NINJA_ARG} && ninja install
+    ninja ${NINJA_ARGS} && ninja install
 
 FROM base AS tri-13-4
 ARG TRI_13_4
