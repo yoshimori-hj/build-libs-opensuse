@@ -2,7 +2,8 @@ ARG VTK82=8.2.0
 ARG VTK90=9.0.3
 ARG VTK91=9.1.0
 ARG VTK92=9.2.6
-ARG VTK93=9.3.0
+ARG VTK93=9.3.1
+ARG VTK94=9.4.1
 ARG TRI_13_0=13-0-1
 ARG TRI_13_2=13-2-0
 ARG TRI_13_4=13-4-1
@@ -10,8 +11,10 @@ ARG TRI_14_0=14-0-0
 ARG TRI_14_2=14-2-0
 ARG TRI_14_4=14-4-0
 ARG PV_5_12=5.12.0
+ARG PV_5_13=5.13.2
 ARG NINJA_ARG="-l 18"
 ARG PYTHON=311
+ARG PYTHONEXEC=/usr/bin/python3.11
 
 ARG VTKHOST=https://www.vtk.org/files/release
 ARG TRIHOST=https://github.com/trilinos/Trilinos/archive/refs/tags
@@ -19,7 +22,10 @@ ARG TRIHOST=https://github.com/trilinos/Trilinos/archive/refs/tags
 ARG USE_MPICH=". /etc/profile.d/lmod.sh && module load gnu && module load mpich"
 ARG USE_OMPI=". /etc/profile.d/lmod.sh && module load gnu && module load openmpi"
 
-FROM opensuse/tumbleweed:latest AS base
+FROM opensuse/tumbleweed:latest AS ref
+RUN zypper ref
+
+FROM ref AS base
 ARG PYTHON
 RUN zypper in -y tar gzip curl cmake ninja clang boost-devel           \
                  libtiff-devel patch libOSMesa-devel Mesa-devel        \
@@ -51,7 +57,7 @@ RUN zypper in -y tar gzip curl cmake ninja clang boost-devel           \
                  pnetcdf-gnu-mpich-hpc-devel                           \
                  pnetcdf-gnu-openmpi4-hpc-devel
 
-FROM opensuse/tumbleweed:latest AS git
+FROM ref AS git
 RUN zypper in -y git
 
 FROM git AS vtksrc
@@ -91,6 +97,11 @@ ARG VTK93
 RUN cd /opt/src/vtk && git checkout v${VTK93} && \
     git submodule update --recursive
 
+FROM vtksrc AS vtksrc94
+ARG VTK94
+RUN cd /opt/src/vtk && git checkout v${VTK94} && \
+    git submodule update --recursive
+
 FROM trilinossrc AS trilinossrc-13-0
 ARG TRI_13_0
 RUN cd /opt/src/Trilinos && git checkout trilinos-release-${TRI_13_0} && \
@@ -126,17 +137,63 @@ ARG PV_5_12
 RUN cd /opt/src/paraview && git checkout v${PV_5_12} && \
     git submodule update --recursive
 
+FROM pvsrc AS pvsrc-5-13
+ARG PV_5_13
+RUN cd /opt/src/paraview && git checkout v${PV_5_13} && \
+    git submodule update --recursive
+
+FROM base AS vtk94
+ARG VTK94
+ARG USE_MPICH
+ARG USE_OMPI
+ARG NINJA_ARG
+ARG PYTHONEXEC
+ARG VTK94ARGS="\
+    -DCMAKE_C_COMPILER=gcc \
+    -DCMAKE_CXX_COMPILER=g++ \
+    -DCMAKE_Fortran_COMPILER=gfortran \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DPython3_EXECUTABLE=${PYTHONEXEC} \
+    -DBUILD_SHARED_LIBS=ON \
+    -DVTK_MODULE_USE_EXTERNAL_VTK_libproj=ON \
+    -DVTK_MODULE_USE_EXTERNAL_VTK_hdf5=ON \
+    -DVTK_MODULE_USE_EXTERNAL_VTK_netcdf=ON \
+    -DVTK_WRAP_PYTHON=ON \
+    -DVTK_USE_MPI=ON \
+    -DVTK_GROUP_ENABLE_MPI=DEFAULT \
+    -DVTK_MODULE_ENABLE_VTK_IOParallelXML=YES \
+    -DVTK_MODULE_ENABLE_VTK_IOParallelXdmf3=YES \
+    -DVTK_MODULE_ENABLE_VTK_IOXdmf3=YES \
+    -DVTK_MODULE_ENABLE_VTK_InfovisCore=YES"
+WORKDIR /opt
+COPY --from=vtksrc94 /opt/src/vtk /opt/src/vtk
+RUN eval "${USE_MPICH}" && module load phdf5 netcdf pnetcdf && \
+    mkdir build-mpich && cd build-mpich && \
+    export MPI_HOME="$MPI_DIR" && \
+    cmake -S ../src/vtk -B . \
+    -DCMAKE_INSTALL_PREFIX=/opt/VTK/${VTK94}-mpich ${VTK94ARGS} -G Ninja || \
+    cmake -S ../src/vtk -B . -DMPI_C_COMPILE_OPTIONS= && \
+    ninja ${NINJA_ARG} && ninja install
+RUN eval "${USE_OMPI}" && module load phdf5 netcdf pnetcdf && \
+    mkdir build-ompi && cd build-ompi && \
+    export MPI_HOME="$MPI_DIR" && \
+    cmake -S ../src/vtk -B . \
+    -DCMAKE_INSTALL_PREFIX=/opt/VTK/${VTK94}-ompi ${VTK94ARGS} -G Ninja && \
+    ninja ${NINJA_ARG} && ninja install
+
 FROM base AS vtk93
 ARG VTK93
 ARG USE_MPICH
 ARG USE_OMPI
 ARG NINJA_ARG
+ARG PYTHONEXEC
 ARG VTK93ARGS="\
     -DCMAKE_C_COMPILER=gcc \
     -DCMAKE_CXX_COMPILER=g++ \
     -DCMAKE_Fortran_COMPILER=gfortran \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo \
     -DBUILD_SHARED_LIBS=ON \
+    -DPython3_EXECUTABLE=${PYTHONEXEC} \
     -DVTK_MODULE_USE_EXTERNAL_VTK_libproj=ON \
     -DVTK_MODULE_USE_EXTERNAL_VTK_hdf5=ON \
     -DVTK_MODULE_USE_EXTERNAL_VTK_netcdf=ON \
@@ -168,12 +225,14 @@ ARG VTK92
 ARG USE_MPICH
 ARG USE_OMPI
 ARG NINJA_ARG
+ARG PYTHONEXEC
 ARG P1=VTK-9857-rebased.patch
 ARG VTK92ARGS="\
-    -DCMAKE_C_COMPILER=gcc \
-    -DCMAKE_CXX_COMPILER=g++ \
+    -DCMAKE_C_COMPILER=gcc-7 \
+    -DCMAKE_CXX_COMPILER=g++-7 \
     -DCMAKE_Fortran_COMPILER=gfortran \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DPython3_EXECUTABLE=${PYTHONEXEC} \
     -DBUILD_SHARED_LIBS=ON \
     -DVTK_MODULE_USE_EXTERNAL_VTK_libproj=ON \
     -DVTK_MODULE_USE_EXTERNAL_VTK_hdf5=ON \
@@ -203,15 +262,44 @@ RUN eval "${USE_OMPI}" && module load phdf5 netcdf pnetcdf && \
     -DCMAKE_INSTALL_PREFIX=/opt/VTK/${VTK92}-ompi ${VTK92ARGS} -G Ninja && \
     ninja ${NINJA_ARG} && ninja install
 
+FROM base AS pv-5-13
+ARG PV_5_13
+ARG USE_OMPI
+ARG NINJA_ARGS
+ARG PYTHONEXEC
+ARG PV_5_13_ARGS="\
+    -DCMAKE_C_COMPILER=gcc \
+    -DCMAKE_CXX_COMPILER=g++ \
+    -DCMAKE_Fortran_COMPILER=gfortran \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DPython3_EXECUTABLE=${PYTHONEXEC} \
+    -DPARAVIEW_BUILD_SHARED_LIBS=ON \
+    -DVTK_MODULE_USE_EXTERNAL_VTK_libproj=ON \
+    -DVTK_MODULE_USE_EXTERNAL_VTK_hdf5=ON \
+    -DVTK_MODULE_USE_EXTERNAL_VTK_netcdf=ON \
+    -DPARAVIEW_USE_MPI=ON \
+    -DPARAVIEW_USE_PYTHON=ON \
+    -DPARAVIEW_BUILD_ALL_MODULES=ON"
+WORKDIR /opt
+COPY --from=pvsrc-5-13 /opt/src/paraview /opt/src/paraview
+RUN eval "${USE_OMPI}" && module load phdf5 netcdf pnetcdf && \
+    mkdir build-ompi && cd build-ompi && \
+    export MPI_HOME="$MPI_DIR" && \
+    cmake -S ../src/paraview -B . \
+    -DCMAKE_INSTALL_PREFIX=/opt/paraview/${PV_5_13}-ompi ${PV_5_13_ARGS} -G Ninja && \
+    ninja ${NINJA_ARGS} && ninja install
+
 FROM base AS pv-5-12
 ARG PV_5_12
 ARG USE_OMPI
 ARG NINJA_ARGS
+ARG PYTHONEXEC
 ARG PV_5_12_ARGS="\
     -DCMAKE_C_COMPILER=gcc \
     -DCMAKE_CXX_COMPILER=g++ \
     -DCMAKE_Fortran_COMPILER=gfortran \
     -DCMAKE_BUILD_TYPE=Release \
+    -DPython3_EXECUTABLE=${PYTHONEXEC} \
     -DPARAVIEW_BUILD_SHARED_LIBS=ON \
     -DVTK_MODULE_USE_EXTERNAL_VTK_libproj=ON \
     -DVTK_MODULE_USE_EXTERNAL_VTK_hdf5=ON \
@@ -303,16 +391,21 @@ ARG VTK90
 ARG VTK91
 ARG VTK92
 ARG VTK93
+ARG VTK94
 ARG TRI_13_0
 ARG TRI_13_2
 ARG TRI_13_4
 ARG PV_5_12
+ARG PV_5_13
 #COPY --from=vtk82 /opt/VTK/${VTK82}* /opt/
 RUN mkdir /opt/VTK /opt/trilinos
 COPY --from=vtk92 /opt/VTK/${VTK92}-ompi /opt/VTK/${VTK92}-ompi
 COPY --from=vtk92 /opt/VTK/${VTK92}-mpich /opt/VTK/${VTK92}-mpich
 COPY --from=vtk93 /opt/VTK/${VTK93}-ompi /opt/VTK/${VTK93}-ompi
 COPY --from=vtk93 /opt/VTK/${VTK93}-mpich /opt/VTK/${VTK93}-mpich
+COPY --from=vtk94 /opt/VTK/${VTK94}-ompi /opt/VTK/${VTK94}-ompi
+COPY --from=vtk94 /opt/VTK/${VTK94}-mpich /opt/VTK/${VTK94}-mpich
 COPY --from=tri-13-4 /opt/trilinos/${TRI_13_4}-ompi /opt/trilinos/${TRI_13_4}-ompi
 COPY --from=tri-13-4 /opt/trilinos/${TRI_13_4}-mpich /opt/trilinos/${TRI_13_4}-mpich
 COPY --from=pv-5-12 /opt/paraview/${PV_5_12}-ompi /opt/paraview/${PV_5_12}-ompi
+COPY --from=pv-5-13 /opt/paraview/${PV_5_13}-ompi /opt/paraview/${PV_5_13}-ompi
