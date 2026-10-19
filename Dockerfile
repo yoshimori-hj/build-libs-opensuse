@@ -4,7 +4,9 @@ ARG VTK91=9.1.0
 ARG VTK92=9.2.6
 ARG VTK93=9.3.1
 ARG VTK94=9.4.2
-ARG VTK95=9.5.1
+ARG VTK95=9.5.2
+ARG VTK96=9.6.2
+ARG VTK97=9.7.1
 ARG TRI_13_0=13-0-1
 ARG TRI_13_2=13-2-0
 ARG TRI_13_4=13-4-1
@@ -12,26 +14,32 @@ ARG TRI_14_0=14-0-0
 ARG TRI_14_2=14-2-0
 ARG TRI_14_4=14-4-0
 ARG TRI_15_1=15-1-1
-ARG TRI_16_1=16-1-0
+ARG TRI_16_0=16-0-0
+ARG TRI_16_2=16-2-2
+ARG TRI_17_2=17-2-1
 ARG PV_5_12=5.12.0
 ARG PV_5_13=5.13.2
-ARG PV_6_0=6.0.0
+ARG PV_6_0=6.0.1
 ARG LAMMPS_22Jul2025=stable_22Jul2025_update1
+ARG CANTERA_3_0=3.0.1
+ARG CANTERA_3_1=3.1.0
+#ARG NINJA_ARG="-l 4"
 ARG NINJA_ARG="-l 18"
 ARG PYTHON=311
 ARG PYTHONEXEC=/usr/bin/python3.11
-ARG MIRROR=http://ftp.riken.jp/Linux/opensuse
+#ARG MIRROR=http://ftp.riken.jp/Linux/opensuse
 ARG OPENMPI=openmpi4 # or openmpi5
-ARG USE_OMPI="source /usr/lib64/mpi/gcc/${OPENMPI}/bin/mpivars.sh"
+ARG MPI_DIR="/usr/lib64/mpi/gcc/${OPENMPI}"
+ARG USE_OMPI="source ${MPI_DIR}/bin/mpivars.sh"
 
 ARG VTKHOST=https://www.vtk.org/files/release
 ARG TRIHOST=https://github.com/trilinos/Trilinos/archive/refs/tags
 
 FROM opensuse/tumbleweed:latest AS ref
-ARG MIRROR
-RUN sed -i~ -e "s|http://download.opensuse.org|${MIRROR}|" \
-    /etc/zypp/repos.d/repo-oss.repo \
-    /etc/zypp/repos.d/repo-non-oss.repo
+#ARG MIRROR
+#RUN sed -i~ -e "s|http://download.opensuse.org|${MIRROR}|" \
+#    /etc/zypp/repos.d/repo-oss.repo \
+#    /etc/zypp/repos.d/repo-non-oss.repo
 RUN zypper ref
 RUN zypper dup -y
 
@@ -55,14 +63,14 @@ RUN zypper in -y tar gzip curl cmake ninja clang boost-devel                 \
                  libqt5-qttools-devel libqt5-qtvirtualkeyboard-devel         \
                  libqt5-qtwayland-devel libqt5-qtwebchannel-devel            \
                  libqt5-qtwebengine-devel libqt5-qtwebsockets-devel          \
-                 libqt5-qtwebview-devel libqt5-qtx11extras-devel             \
-                 libqt5-qtxmlpatterns-devel git libXt-devel libXcursor-devel \
+                 libqt5-qtx11extras-devel libqt5-qtxmlpatterns-devel \
+                 git libXt-devel libXcursor-devel \
                  libXmu-devel proj-devel gcc gcc-c++ gcc-fortran gcc7        \
                  gcc7-c++ gcc7-fortran gcc13 gcc13-c++ gcc13-fortran \
-                 python${PYTHON}-devel \
+                 python${PYTHON}-devel tbb-devel \
                  ${OPENMPI}-devel blas-devel cblas-devel netcdf-devel        \
                  openblas-common-devel lapack-devel lapacke-devel            \
-                 hdf5-${OPENMPI}-devel
+                 hdf5-${OPENMPI}-devel hdf5-devel yaml-cpp-devel
 
 FROM ref AS git
 RUN zypper in -y git
@@ -82,6 +90,10 @@ RUN mkdir /opt/src && cd /opt/src && \
 FROM git AS lammpssrc
 RUN mkdir /opt/src && cd /opt/src && \
     git clone --recursive https://github.com/lammps/lammps.git
+
+FROM git AS canterasrc
+RUN mkdir /opt/src && cd /opt/src && \
+    git clone --recursive https://github.com/Cantera/cantera.git
 
 FROM vtksrc AS vtksrc82
 ARG VTK82
@@ -116,6 +128,16 @@ RUN cd /opt/src/vtk && git checkout v${VTK94} && \
 FROM vtksrc AS vtksrc95
 ARG VTK95
 RUN cd /opt/src/vtk && git checkout v${VTK95} && \
+    git submodule update --init --recursive
+
+FROM vtksrc AS vtksrc96
+ARG VTK96
+RUN cd /opt/src/vtk && git checkout v${VTK96} && \
+    git submodule update --init --recursive
+
+FROM vtksrc AS vtksrc97
+ARG VTK97
+RUN cd /opt/src/vtk && git checkout v${VTK97} && \
     git submodule update --init --recursive
 
 FROM trilinossrc AS trilinossrc-13-0
@@ -153,9 +175,19 @@ ARG TRI_15_1
 RUN cd /opt/src/Trilinos && git checkout trilinos-release-${TRI_15_1} && \
     git submodule update --init --recursive
 
-FROM trilinossrc AS trilinossrc-16-1
-ARG TRI_16_1
-RUN cd /opt/src/Trilinos && git checkout trilinos-release-${TRI_16_1} && \
+FROM trilinossrc AS trilinossrc-16-0
+ARG TRI_16_0
+RUN cd /opt/src/Trilinos && git checkout trilinos-release-${TRI_16_0} && \
+    git submodule update --init --recursive
+
+FROM trilinossrc AS trilinossrc-16-2
+ARG TRI_16_2
+RUN cd /opt/src/Trilinos && git checkout trilinos-release-${TRI_16_2} && \
+    git submodule update --init --recursive
+
+FROM trilinossrc AS trilinossrc-17-2
+ARG TRI_17_2
+RUN cd /opt/src/Trilinos && git checkout trilinos-release-${TRI_17_2} && \
     git submodule update --init --recursive
 
 FROM pvsrc AS pvsrc-5-12
@@ -178,32 +210,103 @@ ARG LAMMPS_22Jul2025
 RUN cd /opt/src/lammps && git checkout ${LAMMPS_22Jul2025} && \
     git submodule update --init --recursive
 
-FROM base AS vtk95
-ARG VTK95
+FROM canterasrc AS canterasrc-3-0
+ARG CANTERA_3_0
+RUN cd /opt/src/cantera && git checkout v${CANTERA_3_0} && \
+    git submodule update --init --recursive
+
+FROM canterasrc AS canterasrc-3-1
+ARG CANTERA_3_1
+RUN cd /opt/src/cantera && git checkout v${CANTERA_3_1} && \
+    git submodule update --init --recursive
+
+FROM base AS vtk97
+ARG VTK97
 ARG USE_OMPI
 ARG NINJA_ARG
 ARG PYTHONEXEC
-ARG VTK95ARGS="\
-    -DCMAKE_C_COMPILER=gcc-13 \
-    -DCMAKE_CXX_COMPILER=g++-13 \
-    -DCMAKE_Fortran_COMPILER=gfortran-13 \
+ARG VTK97ARGS="\
+    -DCMAKE_C_COMPILER=gcc-16 \
+    -DCMAKE_CXX_COMPILER=g++-16 \
+    -DCMAKE_Fortran_COMPILER=gfortran-16 \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo \
     -DPython3_EXECUTABLE=${PYTHONEXEC} \
     -DBUILD_SHARED_LIBS=ON \
     -DVTK_MODULE_USE_EXTERNAL_VTK_libproj=ON \
     -DVTK_MODULE_USE_EXTERNAL_VTK_hdf5=ON \
     -DVTK_WRAP_PYTHON=ON \
+    -DVTK_SMP_IMPLEMENTATION_TYPE=TBB \
     -DVTK_USE_MPI=ON \
     -DVTK_GROUP_ENABLE_MPI=DEFAULT \
     -DVTK_MODULE_ENABLE_VTK_IOParallelXML=YES \
     -DVTK_MODULE_ENABLE_VTK_IOParallelXdmf3=YES \
     -DVTK_MODULE_ENABLE_VTK_IOXdmf3=YES \
     -DVTK_MODULE_ENABLE_VTK_InfovisCore=YES"
-WORKDIR /opt
-COPY --from=vtksrc94 /opt/src/vtk /opt/src/vtk
-RUN ${USE_OMPI} && mkdir build-ompi && cd build-ompi && \
+WORKDIR /opt/build/vtk
+COPY --from=vtksrc97 /opt/src/vtk /opt/src/vtk/${VTK97}
+RUN ${USE_OMPI} && mkdir ${VTK97}-ompi && cd ${VTK97}-ompi && \
     export MPI_HOME="$MPI_DIR" && \
-    cmake -S ../src/vtk -B . \
+    cmake -S /opt/src/vtk/${VTK97} -B . \
+    -DCMAKE_INSTALL_PREFIX=/opt/VTK/${VTK97}-ompi ${VTK97ARGS} -G Ninja && \
+    ninja ${NINJA_ARG} && ninja install
+
+FROM base AS vtk96
+ARG VTK96
+ARG USE_OMPI
+ARG NINJA_ARG
+ARG PYTHONEXEC
+ARG VTK96ARGS="\
+    -DCMAKE_C_COMPILER=gcc-16 \
+    -DCMAKE_CXX_COMPILER=g++-16 \
+    -DCMAKE_Fortran_COMPILER=gfortran-16 \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DPython3_EXECUTABLE=${PYTHONEXEC} \
+    -DBUILD_SHARED_LIBS=ON \
+    -DVTK_MODULE_USE_EXTERNAL_VTK_libproj=ON \
+    -DVTK_MODULE_USE_EXTERNAL_VTK_hdf5=ON \
+    -DVTK_WRAP_PYTHON=ON \
+    -DVTK_SMP_IMPLEMENTATION_TYPE=TBB \
+    -DVTK_USE_MPI=ON \
+    -DVTK_GROUP_ENABLE_MPI=DEFAULT \
+    -DVTK_MODULE_ENABLE_VTK_IOParallelXML=YES \
+    -DVTK_MODULE_ENABLE_VTK_IOParallelXdmf3=YES \
+    -DVTK_MODULE_ENABLE_VTK_IOXdmf3=YES \
+    -DVTK_MODULE_ENABLE_VTK_InfovisCore=YES"
+WORKDIR /opt/build/vtk
+COPY --from=vtksrc96 /opt/src/vtk /opt/src/vtk/${VTK96}
+RUN ${USE_OMPI} && mkdir ${VTK96}-ompi && cd ${VTK96}-ompi && \
+    export MPI_HOME="$MPI_DIR" && \
+    cmake -S /opt/src/vtk/${VTK96} -B . \
+    -DCMAKE_INSTALL_PREFIX=/opt/VTK/${VTK96}-ompi ${VTK96ARGS} -G Ninja && \
+    ninja ${NINJA_ARG} && ninja install
+
+FROM base AS vtk95
+ARG VTK95
+ARG USE_OMPI
+ARG NINJA_ARG
+ARG PYTHONEXEC
+ARG VTK95ARGS="\
+    -DCMAKE_C_COMPILER=gcc-16 \
+    -DCMAKE_CXX_COMPILER=g++-16 \
+    -DCMAKE_Fortran_COMPILER=gfortran-16 \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DPython3_EXECUTABLE=${PYTHONEXEC} \
+    -DBUILD_SHARED_LIBS=ON \
+    -DVTK_MODULE_USE_EXTERNAL_VTK_libproj=ON \
+    -DVTK_MODULE_USE_EXTERNAL_VTK_hdf5=ON \
+    -DVTK_WRAP_PYTHON=ON \
+    -DVTK_SMP_IMPLEMENTATION_TYPE=TBB \
+    -DVTK_USE_MPI=ON \
+    -DVTK_GROUP_ENABLE_MPI=DEFAULT \
+    -DVTK_MODULE_ENABLE_VTK_IOParallelXML=YES \
+    -DVTK_MODULE_ENABLE_VTK_IOParallelXdmf3=YES \
+    -DVTK_MODULE_ENABLE_VTK_IOXdmf3=YES \
+    -DVTK_MODULE_ENABLE_VTK_InfovisCore=YES"
+WORKDIR /opt/build/vtk
+COPY --from=vtksrc95 /opt/src/vtk /opt/src/vtk/${VTK95}
+RUN ${USE_OMPI} && mkdir ${VTK95}-ompi && cd ${VTK95}-ompi && \
+    export MPI_HOME="$MPI_DIR" && \
+    cmake -S /opt/src/vtk/${VTK95} -B . \
     -DCMAKE_INSTALL_PREFIX=/opt/VTK/${VTK95}-ompi ${VTK95ARGS} -G Ninja && \
     ninja ${NINJA_ARG} && ninja install
 
@@ -295,9 +398,42 @@ RUN ${USE_OMPI} && mkdir build-ompi && cd build-ompi && \
     -DCMAKE_INSTALL_PREFIX=/opt/VTK/${VTK92}-ompi ${VTK92ARGS} -G Ninja && \
     ninja ${NINJA_ARG} && ninja install
 
+FROM base AS vtk91
+ARG VTK91
+ARG USE_OMPI
+ARG NINJA_ARG
+ARG PYTHONEXEC
+ARG P1=VTK-9857-rebased.patch
+ARG VTK91ARGS="\
+    -DCMAKE_C_COMPILER=gcc-7 \
+    -DCMAKE_CXX_COMPILER=g++-7 \
+    -DCMAKE_Fortran_COMPILER=gfortran-7 \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+    -DPython3_EXECUTABLE=${PYTHONEXEC} \
+    -DBUILD_SHARED_LIBS=ON \
+    -DVTK_MODULE_USE_EXTERNAL_VTK_libproj=ON \
+    -DVTK_WRAP_PYTHON=OFF \
+    -DVTK_USE_MPI=ON \
+    -DVTK_GROUP_ENABLE_MPI=DEFAULT \
+    -DVTK_MODULE_ENABLE_VTK_IOParallelXML=YES \
+    -DVTK_MODULE_ENABLE_VTK_IOParallelXdmf3=YES \
+    -DVTK_MODULE_ENABLE_VTK_IOXdmf3=YES \
+    -DVTK_MODULE_ENABLE_VTK_InfovisCore=YES"
+WORKDIR /opt
+COPY --from=vtksrc91 /opt/src/vtk /opt/src/vtk
+COPY ${P1} /opt/
+RUN cd src/vtk && patch --fuzz=0 -p1 < /opt/${P1}
+RUN ${USE_OMPI} && mkdir build-ompi && cd build-ompi && \
+    export MPI_HOME="$MPI_DIR" && \
+    cmake -S ../src/vtk -B . \
+    -DCMAKE_INSTALL_PREFIX=/opt/VTK/${VTK91}-ompi ${VTK91ARGS} -G Ninja && \
+    ninja ${NINJA_ARG} && ninja install
+
 FROM base AS vtk82
 ARG VTK82
 ARG USE_OMPI
+ARG NINJA_ARG
 ARG VTK82ARGS="\
     -DBUILD_SHARED_LIBS=ON \
     -DCMAKE_C_COMPILER=gcc-7 \
@@ -334,7 +470,10 @@ ARG PV_6_0_ARGS="\
     -DPARAVIEW_USE_PYTHON=ON \
     -DPARAVIEW_BUILD_ALL_MODULES=ON"
 WORKDIR /opt
+ARG P1="ParaView-6.0.0-EnSightGoldReaderMaxPartId.patch"
 COPY --from=pvsrc-6-0 /opt/src/paraview /opt/src/paraview
+COPY ${P1} /opt
+RUN cd src/paraview && patch -p1 --fuzz=0 < /opt/${P1}
 RUN ${USE_OMPI} && mkdir build-ompi && cd build-ompi && \
     export MPI_HOME="$MPI_DIR" && \
     cmake -S ../src/paraview -B . \
@@ -396,6 +535,7 @@ RUN ${USE_OMPI} && mkdir build-ompi && cd build-ompi && \
 FROM base AS tri-13-4
 ARG TRI_13_4
 ARG USE_OMPI
+ARG MPI_DIR
 ARG NINJA_ARG
 ARG TRI_13_4_ARGS="\
     -DBUILD_SHARED_LIBS=ON \
@@ -404,8 +544,12 @@ ARG TRI_13_4_ARGS="\
     -DCMAKE_Fortran_COMPILER=mpif90 \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo \
     -DTPL_ENABLE_MPI=ON \
+    -DTPL_ENABLE_BLAS=ON \
+    -DTPL_ENABLE_LAPACK=ON \
     -DMPI_BASE_DIR=${MPI_DIR} \
     -DMPI_USE_COMPILER_WRAPPERS=OFF \
+    -DTrilinos_ENABLE_Kokkos=ON \
+    -DTrilinos_ENABLE_Teuchos=ON \
     -DTrilinos_ENABLE_Zoltan2Core=ON"
 ARG P1="Trilinos-11676.patch"
 WORKDIR /opt
@@ -418,6 +562,70 @@ RUN ${USE_OMPI} && mkdir build-ompi && cd build-ompi && \
     export MPI_HOME="$MPI_DIR" && \
     cmake -S ../src/Trilinos -B . \
     -DCMAKE_INSTALL_PREFIX=/opt/trilinos/${TRI_13_4}-ompi ${TRI_13_4_ARGS} \
+    -G Ninja && \
+    ninja ${NINJA_ARG} && ninja install
+
+FROM base AS tri-16-2
+ARG TRI_16_2
+ARG USE_OMPI
+ARG MPI_DIR
+ARG NINJA_ARG
+ARG TRI_16_2_ARGS="\
+    -DBUILD_SHARED_LIBS=ON \
+    -DCMAKE_C_COMPILER=mpicc \
+    -DCMAKE_CXX_COMPILER=mpic++ \
+    -DCMAKE_Fortran_COMPILER=mpif90 \
+    -DCMAKE_CXX_STANDARD=17 \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DTPL_ENABLE_MPI=ON \
+    -DTPL_ENABLE_BLAS=ON \
+    -DTPL_ENABLE_LAPACK=ON \
+    -DMPI_USE_COMPILER_WRAPPERS=OFF \
+    -DTrilinos_ENABLE_Kokkos=ON \
+    -DTrilinos_ENABLE_Teuchos=ON \
+    -DTrilinos_ENABLE_Zoltan2Core=ON"
+WORKDIR /opt
+COPY --from=trilinossrc-16-2 /opt/src/Trilinos /opt/src/Trilinos
+RUN ${USE_OMPI} && mkdir build-ompi && cd build-ompi && \
+    export OMPI_CC=gcc-13 && \
+    export OMPI_CXX=g++-13 && \
+    export OMPI_FC=gfortran-13 && \
+    export MPI_HOME="$MPI_DIR" && \
+    cmake -S ../src/Trilinos -B . \
+    -DCMAKE_INSTALL_PREFIX=/opt/trilinos/${TRI_16_2}-ompi ${TRI_16_2_ARGS} \
+    -DMPI_BASE_DIR=${MPI_DIR} \
+    -G Ninja && \
+    ninja ${NINJA_ARG} && ninja install
+
+FROM base AS tri-17-2
+ARG TRI_17_2
+ARG USE_OMPI
+ARG MPI_DIR
+ARG NINJA_ARG
+ARG TRI_17_2_ARGS="\
+    -DBUILD_SHARED_LIBS=ON \
+    -DCMAKE_C_COMPILER=mpicc \
+    -DCMAKE_CXX_COMPILER=mpic++ \
+    -DCMAKE_Fortran_COMPILER=mpif90 \
+    -DCMAKE_CXX_STANDARD=20 \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DTPL_ENABLE_MPI=ON \
+    -DTPL_ENABLE_BLAS=ON \
+    -DTPL_ENABLE_LAPACK=ON \
+    -DMPI_USE_COMPILER_WRAPPERS=OFF \
+    -DTrilinos_ENABLE_Kokkos=ON \
+    -DTrilinos_ENABLE_Teuchos=ON \
+    -DTrilinos_ENABLE_Zoltan2Core=ON"
+WORKDIR /opt
+COPY --from=trilinossrc-17-2 /opt/src/Trilinos /opt/src/Trilinos
+RUN ${USE_OMPI} && mkdir build-ompi && cd build-ompi && \
+    export OMPI_CC=gcc-13 && \
+    export OMPI_CXX=g++-13 && \
+    export OMPI_FC=gfortran-13 && \
+    export MPI_HOME="$MPI_DIR" && \
+    cmake -S ../src/Trilinos -B . \
+    -DCMAKE_INSTALL_PREFIX=/opt/trilinos/${TRI_17_2}-ompi ${TRI_17_2_ARGS} \
+    -DMPI_BASE_DIR=${MPI_DIR} \
     -G Ninja && \
     ninja ${NINJA_ARG} && ninja install
 
@@ -436,6 +644,7 @@ ARG LAMMPS_22Jul2025_ARGS="\
     -DCMKAE_BUILD_TYPE=RelWithDebInfo \
     -DLAMMPS_INSTALL_RPATH=ON \
     -DPKG_DOC=ON \
+    -DPKG_COMPRESS=ON \
     -DPKG_GRANULAR=ON \
     -DPKG_TALLY=ON \
     -DPKG_VTK=ON"
@@ -449,6 +658,38 @@ RUN ${USE_OMPI} && mkdir build-ompi && cd build-ompi && \
     -G Ninja && \
     ninja ${NINJA_ARG} && ninja install
 
+# Cantera does not support out-of-source build
+FROM base AS cantera-3-0
+ARG CANTERA_3_0
+ARG PYTHONEXEC
+ARG CANTERA_3_0_ARGS="-j8 \
+    python_package=full \
+    system_yamlcpp=y"
+WORKDIR /opt
+COPY --from=canterasrc-3-0 /opt/src/cantera /opt/src/cantera
+RUN ${PYTHONEXEC} -m venv build-cantera && \
+    source build-cantera/bin/activate && \
+    pip install scons numpy Cython wheel ruamel.yaml && \
+    cd /opt/src/cantera && \
+    scons build ${CANTERA_3_0_ARGS} prefix=/opt/cantera/${CANTERA_3_0} && \
+    scons install
+
+FROM base AS cantera-3-1
+ARG CANTERA_3_1
+ARG SCONS_ARG
+ARG PYTHONEXEC
+ARG CANTERA_3_1_ARGS="-j8 \
+    python_package=full \
+    system_yamlcpp=y"
+WORKDIR /opt
+COPY --from=canterasrc-3-1 /opt/src/cantera /opt/src/cantera
+RUN ${PYTHONEXEC} -m venv build-cantera && \
+    source build-cantera/bin/activate && \
+    pip install scons numpy Cython wheel ruamel.yaml packaging && \
+    cd /opt/src/cantera && \
+    scons build ${CANTERA_3_1_ARGS} prefix=/opt/cantera/${CANTERA_3_1} && \
+    scons install
+
 FROM base AS final
 ARG VTK82
 ARG VTK90
@@ -457,20 +698,34 @@ ARG VTK92
 ARG VTK93
 ARG VTK94
 ARG VTK95
+ARG VTK96
+ARG VTK97
 ARG TRI_13_0
 ARG TRI_13_2
 ARG TRI_13_4
+ARG TRI_16_0
+ARG TRI_16_2
+ARG TRI_17_2
 ARG PV_5_12
 ARG PV_5_13
 ARG PV_6_0
 ARG LAMMPS_22Jul2025
+ARG CANTERA_3_0
+ARG CANTERA_3_1
 COPY --from=vtk82 /opt/VTK/${VTK82}-ompi /opt/VTK/${VTK82}-ompi
+COPY --from=vtk91 /opt/VTK/${VTK91}-ompi /opt/VTK/${VTK91}-ompi
 COPY --from=vtk92 /opt/VTK/${VTK92}-ompi /opt/VTK/${VTK92}-ompi
-COPY --from=vtk93 /opt/VTK/${VTK93}-ompi /opt/VTK/${VTK93}-ompi
-COPY --from=vtk94 /opt/VTK/${VTK94}-ompi /opt/VTK/${VTK94}-ompi
-COPY --from=vtk95 /opt/VTK/${VTK95}-ompi /opt/VTK/${VTK95}-ompi
-#COPY --from=tri-13-4 /opt/trilinos/${TRI_13_4}-ompi /opt/trilinos/${TRI_13_4}-ompi
+#COPY --from=vtk93 /opt/VTK/${VTK93}-ompi /opt/VTK/${VTK93}-ompi
+#COPY --from=vtk94 /opt/VTK/${VTK94}-ompi /opt/VTK/${VTK94}-ompi
+#COPY --from=vtk95 /opt/VTK/${VTK95}-ompi /opt/VTK/${VTK95}-ompi
+COPY --from=vtk96 /opt/VTK/${VTK96}-ompi /opt/VTK/${VTK96}-ompi
+COPY --from=vtk97 /opt/VTK/${VTK97}-ompi /opt/VTK/${VTK97}-ompi
+COPY --from=tri-13-4 /opt/trilinos/${TRI_13_4}-ompi /opt/trilinos/${TRI_13_4}-ompi
+COPY --from=tri-16-2 /opt/trilinos/${TRI_16_2}-ompi /opt/trilinos/${TRI_16_2}-ompi
+COPY --from=tri-17-2 /opt/trilinos/${TRI_17_2}-ompi /opt/trilinos/${TRI_17_2}-ompi
 #COPY --from=pv-5-13 /opt/paraview/${PV_5_13}-ompi /opt/paraview/${PV_5_13}-ompi
 #COPY --from=pv-6-0 /opt/paraview/${PV_6_0}-ompi /opt/paraview/${PV_6_0}-ompi
-COPY --from=lammps-22jul2025 /opt/lammps/${LAMMPS_22Jul2025}-ompi \
-     /opt/lammps/${LAMMPS_22Jul2025}-ompi
+#COPY --from=lammps-22jul2025 /opt/lammps/${LAMMPS_22Jul2025}-ompi \
+#     /opt/lammps/${LAMMPS_22Jul2025}-ompi
+COPY --from=cantera-3-0 /opt/cantera/${CANTERA_3_0} /opt/cantera/${CANTERA_3_0}
+COPY --from=cantera-3-1 /opt/cantera/${CANTERA_3_1} /opt/cantera/${CANTERA_3_1}
